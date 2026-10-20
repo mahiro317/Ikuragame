@@ -1,3 +1,4 @@
+
 const gameArea = document.getElementById("game-area");
 const scoreDisplay = document.getElementById("score");
 const timerDisplay = document.getElementById("timer");
@@ -22,34 +23,31 @@ let timerId = null;
 let endTime = 0;
 let lastFrameTime = 0;
 
-// 画面上の座標を安全な範囲に収める
-function clamp(value, min, max) {
-    return Math.max(min, Math.min(value, max));
-}
-
-// ゲームエリア内にボールを生成する
+// ボールを生成する
 function createBall() {
     const ball = document.createElement("div");
     ball.classList.add("ball");
 
-    // ボールのサイズと色を統一
-    const size = 36;
-    ball.style.width = `${size}px`;
-    ball.style.height = `${size}px`;
-    ball.style.backgroundColor = "#ff7043";
+    // サイズと色を統一
+    ball.style.width = `${BALL_SIZE}px`;
+    ball.style.height = `${BALL_SIZE}px`;
+    ball.style.backgroundColor = BALL_COLOR;
 
-    // 出現位置をランダムにする
-    const maxX = gameArea.clientWidth - size;
-    const maxY = gameArea.clientHeight - size;
+    // 初期位置
+    ball.x = Math.random() * Math.max(0, gameArea.clientWidth - BALL_SIZE);
+    ball.y = Math.random() * Math.max(0, gameArea.clientHeight - BALL_SIZE);
 
-    ball.style.left = `${Math.random() * maxX}px`;
-    ball.style.top = `${Math.random() * maxY}px`;
+    // 移動速度
+    ball.vx = (Math.random() - 0.5) * 200;
+    ball.vy = (Math.random() - 0.5) * 200;
 
-    // 移動方向と速度はランダム
-    ball.dx = (Math.random() - 0.5) * 200;
-    ball.dy = (Math.random() - 0.5) * 200;
+    ball.size = BALL_SIZE;
     ball.alive = true;
 
+    ball.style.left = `${ball.x}px`;
+    ball.style.top = `${ball.y}px`;
+
+    // クリックしたらイクラをつぶす
     ball.addEventListener("pointerdown", function (event) {
         event.preventDefault();
 
@@ -58,11 +56,17 @@ function createBall() {
         }
 
         ball.alive = false;
+
         score++;
         scoreDisplay.textContent = score;
 
         ball.classList.add("popping");
         setTimeout(() => ball.remove(), 180);
+
+        // すべてのイクラをつぶしたらゲーム終了
+        if (balls.every(b => !b.alive)) {
+            endGame();
+        }
     });
 
     gameArea.appendChild(ball);
@@ -71,8 +75,8 @@ function createBall() {
 
 // ボールを初期配置する
 function createBalls() {
-    // 前回のゲームのボールを削除
-    balls.forEach((ball) => ball.element.remove());
+    // 前回のボールをすべて削除
+    balls.forEach(ball => ball.remove());
     balls = [];
 
     for (let i = 0; i < BALL_COUNT; i++) {
@@ -111,18 +115,17 @@ function moveBalls(deltaTime) {
             ball.vy = -Math.abs(ball.vy);
         }
 
-        ball.element.style.left = `${ball.x}px`;
-        ball.element.style.top = `${ball.y}px`;
+        ball.style.left = `${ball.x}px`;
+        ball.style.top = `${ball.y}px`;
     }
 }
 
-// 毎フレーム呼ばれるアニメーション処理
+// ボールを動かし続ける
 function animate(timestamp) {
     if (!isPlaying) {
         return;
     }
 
-    // フレーム間の経過時間を秒に変換
     const deltaTime = lastFrameTime === 0
         ? 0
         : Math.min((timestamp - lastFrameTime) / 1000, 0.05);
@@ -157,7 +160,7 @@ function startGame() {
         return;
     }
 
-    // 前回のアニメーションとタイマーを停止
+    // 前回のタイマーとアニメーションを停止
     if (animationId !== null) {
         cancelAnimationFrame(animationId);
     }
@@ -176,10 +179,10 @@ function startGame() {
 
     message.style.display = "none";
 
-    // ゲーム開始時にまとめてボールを出現させる
+    // イクラを配置する
     createBalls();
 
-    // 現在時刻を基準に終了時刻を決める
+    // 終了時刻を設定
     endTime = Date.now() + GAME_DURATION * 1000;
     lastFrameTime = 0;
 
@@ -195,33 +198,23 @@ function endGame() {
 
     isPlaying = false;
 
+    clearInterval(timerId);
+
     if (animationId !== null) {
         cancelAnimationFrame(animationId);
-        animationId = null;
     }
-
-    if (timerId !== null) {
-        clearInterval(timerId);
-        timerId = null;
-    }
-
-    timeLeft = 0;
-    timerDisplay.textContent = "0.0";
-    timeProgress.style.width = "0%";
-
-    message.innerHTML = `
-        <h1>TIME UP!</h1>
-        <p>あなたのスコアは <strong>${score}</strong> 点！</p>
-        <p>もう一度チャレンジしてみよう！</p>
-        <button id="start-button">もう一度プレイ</button>
-    `;
 
     message.style.display = "flex";
+    message.innerHTML = `
+        <h2>GAME OVER</h2>
+        <p>スコア：${score} 点</p>
+        <p>残り時間：${timeLeft.toFixed(1)} 秒</p>
+        <button id="restart-button">もう一度プレイ</button>
+    `;
 
-    // innerHTMLで作り直したボタンにイベントを設定
-    document.getElementById("start-button")
+    document.getElementById("restart-button")
         .addEventListener("click", startGame);
 }
 
-// ゲーム開始ボタンにイベントを設定
+// スタートボタンの設定
 startButton.addEventListener("click", startGame);
